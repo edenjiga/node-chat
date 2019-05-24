@@ -12,22 +12,54 @@ const messageTemplate = document.querySelector('#message-template').innerHTML;
 const locationMessageTemplate = document.querySelector(
   '#location-message-template'
 ).innerHTML;
+const sidebarTemplate = document.querySelector('#sidebar-template').innerHTML;
+//Options
+const { username, room } = Qs.parse(location.search, {
+  ignoreQueryPrefix: true
+});
 
-socket.on('message', ({ message, createdAt }) => {
+const autoScroll = () => {
+  // New message element
+  const $newMessage = $messages.lastElementChild;
+
+  //Height of the new message
+  const newMessageStyles = getComputedStyle($newMessage);
+  const newMessageMargin = parseInt(newMessageStyles.marginBottom);
+  const newMessageHeight = $newMessage.offsetHeight + newMessageMargin;
+
+  //Visible height
+
+  const visibleHeight = $messages.offsetHeight;
+
+  //height of message container
+  const contianerHeight = $messages.scrollHeight;
+
+  //how far have i scrolled ?
+  const scrollOffSet = $messages.scrollTop + visibleHeight;
+
+  if (contianerHeight - newMessageHeight <= scrollOffSet) {
+    $messages.scrollTop = $messages.scrollHeight;
+  }
+};
+
+socket.on('message', ({ message, createdAt, username }) => {
   const html = Mustache.render(messageTemplate, {
+    username,
     message,
     createdAt: moment(createdAt).format('h:m a')
   });
   $messages.insertAdjacentHTML('beforeend', html);
+  autoScroll();
 });
 
 socket.on('locationMessage', ({ url, createdAt }) => {
-  console.log(url);
   const html = Mustache.render(locationMessageTemplate, {
+    username: message.username,
     url,
     createdAt: moment(createdAt).format('h:m a')
   });
   $messages.insertAdjacentHTML('beforeend', html);
+  autoScroll();
 });
 
 $messageForm.addEventListener('submit', e => {
@@ -50,6 +82,15 @@ $messageForm.addEventListener('submit', e => {
   });
 });
 
+socket.on('roomData', ({ room, users }) => {
+  const html = Mustache.render(sidebarTemplate, {
+    room,
+    users
+  });
+
+  document.querySelector('#sidebar').innerHTML = html;
+});
+
 $sendLocationButton.addEventListener('click', () => {
   if (!navigator.geolocation) {
     return alert('Geolocation is not supported by your browser.');
@@ -70,4 +111,11 @@ $sendLocationButton.addEventListener('click', () => {
       }
     );
   });
+});
+
+socket.emit('join', { username, room }, error => {
+  if (error) {
+    alert(error);
+    location.href = '/';
+  }
 });
